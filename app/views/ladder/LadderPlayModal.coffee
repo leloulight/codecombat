@@ -81,6 +81,7 @@ module.exports = class LadderPlayModal extends ModalView
   # PART 4: Render
 
   finishRendering: ->
+    return if @destroyed
     @checkTutorialLevelExists (exists) =>
       @tutorialLevelExists = exists
       @render()
@@ -101,6 +102,7 @@ module.exports = class LadderPlayModal extends ModalView
       {id: 'coffeescript', name: 'CoffeeScript (Experimental)'}
       {id: 'clojure', name: 'Clojure (Experimental)'}
       {id: 'lua', name: 'Lua'}
+      {id: 'java', name: 'Java'}
       #{id: 'io', name: 'Io (Experimental)'}
     ]
     ctx.league = @options.league
