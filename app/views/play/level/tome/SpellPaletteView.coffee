@@ -44,7 +44,7 @@ module.exports = class SpellPaletteView extends CocoView
     c.defaultGroupSlug = @defaultGroupSlug
     c.showsHelp = @showsHelp
     c.tabs = @tabs  # For hero-based, non-this-owned tabs like Vector, Math, etc.
-    c.thisName = {coffeescript: '@', lua: 'self', python: 'self'}[@options.language] or 'this'
+    c.thisName = {coffeescript: '@', lua: 'self', python: 'self', java: 'hero'}[@options.language] or 'this'
     c._ = _
     c
 
@@ -324,7 +324,7 @@ module.exports = class SpellPaletteView extends CocoView
     @openModalView gameMenuModal
     @listenToOnce gameMenuModal, 'change-hero', ->
       @setupManager?.destroy()
-      @setupManager = new LevelSetupManager({supermodel: @supermodel, level: @level, levelID: @level.get('slug'), parent: @, session: @session})
+      @setupManager = new LevelSetupManager({supermodel: @supermodel, level: @level, levelID: @level.get('slug'), parent: @, session: @session, courseID: @options.courseID, courseInstanceID: @options.courseInstanceID})
       @setupManager.open()
 
   destroy: ->

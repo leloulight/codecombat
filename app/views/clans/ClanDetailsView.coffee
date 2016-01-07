@@ -92,7 +92,7 @@ module.exports = class ClanDetailsView extends RootView
     userConceptsMap = {}
     if @campaigns.loaded
       levelCount = 0
-      for campaign in @campaigns.models
+      for campaign in @campaigns.models when campaign.get('type') is 'hero'
         campaignID = campaign.id
         lastLevelIndex = 0
         for levelID, level of campaign.get('levels')
@@ -181,8 +181,7 @@ module.exports = class ClanDetailsView extends RootView
     @campaignLevelProgressions = []
     @conceptsProgression = []
     @arenas = []
-    for campaign in @campaigns.models
-      continue if campaign.get('slug') is 'auditions'
+    for campaign in @campaigns.models when campaign.get('type') is 'hero'
       campaignLevelProgression =
         ID: campaign.id
         slug: campaign.get('slug')
@@ -196,7 +195,7 @@ module.exports = class ClanDetailsView extends RootView
         if level.concepts?
           for concept in level.concepts
             @conceptsProgression.push concept unless concept in @conceptsProgression
-        if level.type is 'hero-ladder'
+        if level.type is 'hero-ladder' and level.slug not in ['capture-their-flag']
           @arenas.push level
       @campaignLevelProgressions.push campaignLevelProgression
     @render?()

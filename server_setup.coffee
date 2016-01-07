@@ -8,11 +8,13 @@ compressible = require 'compressible'
 geoip = require 'geoip-lite'
 
 database = require './server/commons/database'
+perfmon = require './server/commons/perfmon'
 baseRoute = require './server/routes/base'
 user = require './server/users/user_handler'
 logging = require './server/commons/logging'
 config = require './server_config'
 auth = require './server/routes/auth'
+routes = require './server/routes'
 UserHandler = require './server/users/user_handler'
 hipchat = require './server/hipchat'
 global.tv4 = require 'tv4' # required for TreemaUtils to work
@@ -28,6 +30,7 @@ productionLogging = (tokens, req, res) ->
   else if status >= 300 then color = 36
   elapsed = (new Date()) - req._startTime
   elapsedColor = if elapsed < 500 then 90 else 31
+  return null if status is 404 and /\/feedback/.test req.originalUrl  # We know that these usually 404 by design (bad design?)
   if (status isnt 200 and status isnt 201 and status isnt 204 and status isnt 304 and status isnt 302) or elapsed > 500
     return "\x1b[90m#{req.method} #{req.originalUrl} \x1b[#{color}m#{res.statusCode} \x1b[#{elapsedColor}m#{elapsed}ms\x1b[0m"
   null
@@ -127,8 +130,11 @@ setupRedirectMiddleware = (app) ->
     nameOrID = req.path.split('/')[3]
     res.redirect 301, "/user/#{nameOrID}/profile"
 
+setupPerfMonMiddleware = (app) ->
+  app.use perfmon.middleware
 
 exports.setupMiddleware = (app) ->
+  setupPerfMonMiddleware app
   setupCountryRedirectMiddleware app, "china", "CN", "zh", "tokyo"
   setupCountryRedirectMiddleware app, "brazil", "BR", "pt-BR", "saoPaulo"
   setupMiddlewareToSendOldBrowserWarningWhenPlayersViewLevelDirectly app
@@ -162,6 +168,7 @@ setupFacebookCrossDomainCommunicationRoute = (app) ->
     res.sendfile path.join(__dirname, 'public', 'channel.html')
 
 exports.setupRoutes = (app) ->
+  routes.setup(app)
   app.use app.router
 
   baseRoute.setup app
