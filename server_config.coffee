@@ -1,12 +1,12 @@
 config = {}
 
-config.unittest = process.argv.indexOf('--unittest') > -1
+config.unittest = global.testing
 
 config.tokyo = process.env.TOKYO or false
 config.saoPaulo = process.env.SAOPAULO or false
 config.chinaDomain = "http://cn.codecombat.com"
 config.brazilDomain = "http://br.codecombat.com"
-config.port = process.env.COCO_PORT or process.env.COCO_NODE_PORT or 3000
+config.port = process.env.COCO_PORT or process.env.COCO_NODE_PORT or process.env.PORT  or 3000
 config.ssl_port = process.env.COCO_SSL_PORT or process.env.COCO_SSL_NODE_PORT or 3443
 config.cloudflare =
   token: process.env.COCO_CLOUDFLARE_API_KEY or ''
@@ -84,5 +84,10 @@ if not config.unittest and  not config.isProduction
   # change artificially slow down non-static requests for testing
   config.slow_down = false
 
+if process.env.COCO_STATSD_HOST
+  config.statsd =
+    host: process.env.COCO_STATSD_HOST
+    port: process.env.COCO_STATSD_PORT or 8125
+    prefix: process.env.COCO_STATSD_PREFIX or ''
 
 module.exports = config

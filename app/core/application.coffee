@@ -19,6 +19,7 @@ preventBackspace = (event) ->
   if event.keyCode is 8 and not elementAcceptsKeystrokes(event.srcElement or event.target)
     event.preventDefault()
   else if (key.ctrl or key.command) and not key.alt and event.keyCode in ctrlDefaultPrevented
+    console.debug "Prevented keystroke", key
     event.preventDefault()
 
 elementAcceptsKeystrokes = (el) ->
@@ -48,6 +49,8 @@ Application = initialize: ->
   @isProduction = -> document.location.href.search('https?://localhost:3000') is -1
   @isIPadApp = webkit?.messageHandlers? and navigator.userAgent?.indexOf('CodeCombat-iPad') isnt -1
   $('body').addClass 'ipad' if @isIPadApp
+  if $.browser.msie and parseInt($.browser.version) is 10
+    $("html").addClass("ie10")
   @tracker = new Tracker()
   @facebookHandler = new FacebookHandler()
   @gplusHandler = new GPlusHandler()
