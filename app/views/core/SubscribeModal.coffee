@@ -27,10 +27,13 @@ module.exports = class SubscribeModal extends ModalView
     @state = 'standby'
     @products = new Products()
     @supermodel.loadCollection(@products, 'products')
-    
+
   onLoaded: ->
     @basicProduct = @products.findWhere { name: 'basic_subscription' }
     @yearProduct = @products.findWhere { name: 'year_subscription' }
+    if countrySpecificProduct = @products.findWhere { name: "#{me.get('country')}_basic_subscription" }
+      @basicProduct = countrySpecificProduct
+      @yearProduct = @products.findWhere { name: "#{me.get('country')}_year_subscription" }  # probably null
     super()
 
   afterRender: ->
@@ -38,6 +41,9 @@ module.exports = class SubscribeModal extends ModalView
     @setupParentButtonPopover()
     @setupParentInfoPopover()
     @setupPaymentMethodsInfoPopover()
+    if @basicProduct
+      @$el.find('.gem-amount').html $.i18n.t('subscribe.feature4').replace('{{gems}}', @basicProduct.get('gems'))
+    @playSound 'game-menu-open'
 
   setupParentButtonPopover: ->
     popoverTitle = $.i18n.t 'subscribe.parent_email_title'
@@ -61,12 +67,11 @@ module.exports = class SubscribeModal extends ModalView
     levelsCompleted = me.get('stats')?.gamesCompleted or 'several'
     popoverContent = "<p>" + $.i18n.t('subscribe.parents_blurb1', nLevels: levelsCompleted) + "</p>"
     popoverContent += "<p>" + $.i18n.t('subscribe.parents_blurb1a') + "</p>"
-    popoverContent += "<p>" + $.i18n.t('subscribe.parents_blurb2a') + "</p>"
-    price = (@products.findWhere({'name': 'basic_subscription'}).get('amount') / 100).toFixed(2)
+    popoverContent += "<p>" + $.i18n.t('subscribe.parents_blurb2') + "</p>"
+    price = (@basicProduct.get('amount') / 100).toFixed(2)
     # TODO: Update i18next and use its own interpolation system instead
     popoverContent = popoverContent.replace('{{price}}', price)
     popoverContent += "<p>" + $.i18n.t('subscribe.parents_blurb3') + "</p>"
-    #popoverContent = popoverContent.replace /9[.,]99/g, '3.99'  # Sale
     @$el.find('#parents-info').popover(
       animation: true
       html: true
@@ -81,13 +86,16 @@ module.exports = class SubscribeModal extends ModalView
   setupPaymentMethodsInfoPopover: ->
     return unless @products.size()
     popoverTitle = $.i18n.t('subscribe.payment_methods_title')
-    three_month_price = (@products.findWhere({'name': 'basic_subscription'}).get('amount') * 3 / 100).toFixed(2)
-    year_price = (@products.findWhere({name: 'year_subscription'}).get('amount') / 100).toFixed(2)
+    threeMonthPrice = (@basicProduct.get('amount') * 3 / 100).toFixed(2)
+    if @yearProduct
+      yearPrice = (@yearProduct.get('amount') / 100).toFixed(2)
+    else
+      yearPrice = (@basicProduct.get('amount') * 12 / 100).toFixed(2)
     popoverTitle += '<button type="button" class="close" onclick="$(&#39;#payment-methods-info&#39;).popover(&#39;hide&#39;);">&times;</button>'
-    popoverContent = "<p>" + $.i18n.t('subscribe.payment_methods_blurb1a') + "</p>"
+    popoverContent = "<p>" + $.i18n.t('subscribe.payment_methods_blurb1') + "</p>"
     # TODO: Update i18next and use its own interpolation system instead
-    popoverContent = popoverContent.replace('{{three_month_price}}', three_month_price)
-    popoverContent = popoverContent.replace('{{year_price}}', year_price)
+    popoverContent = popoverContent.replace('{{three_month_price}}', threeMonthPrice)
+    popoverContent = popoverContent.replace('{{year_price}}', yearPrice)
     popoverContent += "<p>" + $.i18n.t('subscribe.payment_methods_blurb2') + " <a href='mailto:support@codecombat.com'>support@codecombat.com</a>."
     @$el.find('#payment-methods-info').popover(
       animation: true
@@ -124,7 +132,7 @@ module.exports = class SubscribeModal extends ModalView
     @$el.find('.parent-button').popover('hide')
 
   onClickPurchaseButton: (e) ->
-    return unless @basicProduct and @yearProduct
+    return unless @basicProduct
     @playSound 'menu-button-click'
     return @openModalView new AuthModal() if me.get('anonymous')
     application.tracker?.trackEvent 'Started subscription purchase'
@@ -134,16 +142,6 @@ module.exports = class SubscribeModal extends ModalView
       alipay: if me.get('country') is 'china' or (me.get('preferredLanguage') or 'en-US')[...2] is 'zh' then true else 'auto'
       alipayReusable: true
     }
-
-    # SALE LOGIC
-    # overwrite amount with sale price
-    # maybe also put in another description with details about how long it lasts, etc
-    # NOTE: Do not change this price without updating the context.price in getRenderData
-    # NOTE: And, the popover content if necessary
-    #options = {
-    #  description: 'Monthly Subscription (HoC sale)'
-    #  amount: 399
-    #}
 
     @purchasedAmount = options.amount
     stripeHandler.open(options)
@@ -155,7 +153,7 @@ module.exports = class SubscribeModal extends ModalView
     discount = @basicProduct.get('amount') * 12 - @yearProduct.get('amount')
     discountString = (discount/100).toFixed(2)
     options =
-      description: $.i18n.t('subscribe.stripe_description_year_sale1').replace('{{discount}}', discountString)
+      description: $.i18n.t('subscribe.stripe_description_year_sale').replace('{{discount}}', discountString)
       amount: @yearProduct.get('amount')
       alipay: if me.get('country') is 'china' or (me.get('preferredLanguage') or 'en-US')[...2] is 'zh' then true else 'auto'
       alipayReusable: true
@@ -224,3 +222,7 @@ module.exports = class SubscribeModal extends ModalView
       @state = 'unknown_error'
       @stateMessage = "#{xhr.status}: #{xhr.responseText}"
     @render()
+
+  onHidden: ->
+    super()
+    @playSound 'game-menu-close'

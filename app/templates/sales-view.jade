@@ -11,9 +11,14 @@ block content
         img(src='/images/pages/sales/chat_icon.png')
         div contact us for pricing and a free trial
 
-    .hero-quote-container
-      .hero-quote "CodeCombat is without question the most engaging platform for learning programming languages."
-      .hero-quote-attribution Jonathan P., Elementary Computers Teacher
+    table
+      tr
+        td
+          .big-quote-mark “
+        td
+          .hero-quote-container
+            .hero-quote CodeCombat is without question the most engaging platform for learning programming languages.”
+            .hero-quote-attribution - Jonathan P., Elementary Computers Teacher
 
     if me.isAnonymous()
       .text-center
@@ -42,13 +47,13 @@ block content
         .col-md-5
           img#img-game(src='/images/pages/sales/screen1.png')
           .text-center
-            i 
+            i
               small Students learn by writing code to complete levels in the game.
         .col-md-7
           #blurb1
             //- TODO: why don't jade inline tags work here?
             //- http://stackoverflow.com/questions/10953326/what-is-a-concise-way-to-create-inline-elements-in-jade
-            p 
+            p
               strong.spr CodeCombat
               span.spr is a platform for students to learn programming all while playing a game with their classmates.  We believe in encouraging
               strong.spr real, typed code
@@ -78,7 +83,7 @@ block content
         .col-md-5
           img.img-game(src='/images/pages/sales/screen2.png')
           .text-center
-            i 
+            i
               small Teachers can monitor progress, manage classrooms and more.
 
       if me.isAnonymous()
@@ -97,13 +102,14 @@ block content
           td
             #quote1-container
               .teacher-quote
-                span.spr "My class had been struggling with the basics of Python all year. Today they were having fun and getting into it
-                strong - I think they actually forgot that they were actually learning something."
+                span.spr &ldquo;My class had been struggling with the basics of Python all year. Today they were having fun and getting into it
+                strong - I think they forgot that they were actually learning something.&rdquo;
               .row
                 .col-md-4
                 .col-md-8
                   .hero-quote-attribution
                     .teacher-name Tim M.
+                    a(href='https://twitter.com/timmaki',target='_blank') @timmaki
                     .teacher-location Director of Technology, Tilton School
           td
             #quote2-container
@@ -115,8 +121,8 @@ block content
                     .teacher-location.text-right Global Learning Charter Public School
                 .col-md-4
               .teacher-quote
-                span.spr "My girls, who were apprehensive about taking a coding class, ar some of my top students.
-                strong They work together and explain the code to each other to make sure each understands."
+                span.spr &ldquo;My girls, who were apprehensive about taking a coding class, are some of my top students.
+                strong They work together and explain the code to each other to make sure each understands.&rdquo;
       br
 
       .text-center.section-subheader Students play CodeCombat during #HourOfCode 2015
@@ -168,7 +174,7 @@ block content
           ul
             li Students collaborate and help each other solve levels.
             li Appeals to all genders and a wide range of age groups.
-        .cold-md-6
+        .col-md-6
           ul
             li Typed code gives students an advantage over block-based programs.
             li Success with both high-performing and low-performing students, as well as ESL.
@@ -178,7 +184,7 @@ block content
         .col-md-8
           p.text-center
             span.section-header What are paid courses?
-          p The one-hour long "Introduction to Computer Science" course will always be free for an unlimited number of students. Paid enrollments allow each student access to Computer Science 2, 3, and 4, which is an additional 15 hours of content on top of the free contnet.  Paid enrollments never expire.
+          p The one-hour long "Introduction to Computer Science" course will always be free for an unlimited number of students. Paid enrollments allow each student access to Computer Science 2, 3, and 4, which is an additional 15 hours of content on top of the free content.  Paid enrollments never expire.
 
           #course-comparisons
             img(src='/images/pages/sales/content_table.png')
@@ -187,7 +193,7 @@ block content
           p Per-student pricing allows us to better support flexibility for both large and small schools. Contact us if you are interested in purchasing paid course enrollments for your classroom or school.  Free trials are also available upon request.
 
         .col-md-4
-          .well 
+          .well
             p.text-center.blurb-subtitle Resources for Teachers
             p
               a(href='http://codecombat.com/docs/CodeCombatHourofCodeGettingStartedGuide.pdf')
@@ -203,7 +209,9 @@ block content
                 small Solution guides and additional lesson plans available for paid courses.
             p
               i
-                small Contact team@codecombat.com with additional requests.
+                small.spr Contact
+                a(href='mailto:team@codecombat.com') team@codecombat.com
+                small.spl with additional requests.
       br
       br
 
