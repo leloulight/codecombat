@@ -42,13 +42,14 @@ exports.config =
       onCompile: (files) -> console.log "I feel the need, the need... for speed."
       plugins:
         coffeelint:
-          pattern: /\A\Z/   
+          pattern: /\A\Z/
     vagrant:
       watcher:
         usePolling: true
 
   server:
-    command: 'nodemon .'
+    # NOTE: This is a temporary workaround for https://github.com/nodejs/node-v0.x-archive/issues/2318
+    command: "#{if process.platform is 'win32' then 'node_modules\\.bin\\nodemon.cmd' else 'nodemon'} ."
 
   files:
     javascripts:
@@ -113,7 +114,9 @@ exports.config =
         'javascripts/app/vendor/aether-io.js': 'bower_components/aether/build/io.js'
         'javascripts/app/vendor/aether-javascript.js': 'bower_components/aether/build/javascript.js'
         'javascripts/app/vendor/aether-lua.js': 'bower_components/aether/build/lua.js'
+        'javascripts/app/vendor/aether-java.js': 'bower_components/aether/build/java.js'
         'javascripts/app/vendor/aether-python.js': 'bower_components/aether/build/python.js'
+        'javascripts/app/vendor/aether-java.js': 'bower_components/aether/build/java.js'
 
         # Any vendor libraries we don't want the client to load immediately
         'javascripts/app/vendor/d3.js': regJoin('^bower_components/d3')
@@ -127,7 +130,7 @@ exports.config =
 
         #- test, demo libraries
         'javascripts/app/tests.js': regJoin('^test/app/')
-        'javascripts/demo-app.js': regJoin('^test/demo/')
+        'javascripts/app/demo-app.js': regJoin('^test/demo/')
 
         #- More output files are generated at the below
 
@@ -203,6 +206,9 @@ exports.config =
     assetsmanager:
       copyTo:
         'lib/ace': ['node_modules/ace-builds/src-min-noconflict/*']
+        'fonts': ['bower_components/openSansCondensed/*']
+    autoReload:
+      delay: 1000
 
   modules:
     definition: (path, data) ->

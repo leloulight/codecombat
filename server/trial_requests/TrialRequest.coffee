@@ -21,31 +21,14 @@ TrialRequestSchema.pre 'save', (next) ->
   prepaid.save (err) =>
     if err
       log.error "Trial request prepaid creation error: #{err}"
-
-    # Special HoC trial: Add 500 course headcount with end date
-    endDate = new Date()
-    endDate.setUTCMonth(endDate.getUTCMonth() + 2)
-    prepaid = new Prepaid
-      creator: @get('applicant')
-      type: 'course'
-      maxRedeemers: 500
-      properties:
-        endDate: endDate
-        trialRequestID: @get('_id')
-    prepaid.save (err) =>
-      if err
-        log.error "Trial request prepaid creation error: #{err}"
-      next()
+    next()
 
 TrialRequestSchema.post 'save', (doc) ->
-  if doc.get('status') is 'submitted'
-    msg = "<a href=\"http://codecombat.com/admin/trial-requests\">Trial Request</a> submitted by #{doc.get('properties')?.email}"
-    hipchat.sendHipChatMessage msg, ['tower']
-  else if doc.get('status') is 'approved'
+  if doc.get('status') is 'approved'
     emailParams =
       recipient:
         address: doc.get('properties')?.email
-      email_id: sendwithus.templates.teacher_free_trial_hoc
+      email_id: sendwithus.templates.teacher_free_trial
     sendwithus.api.send emailParams, (err, result) =>
       log.error "sendwithus trial request approved error: #{err}, result: #{result}" if err
 

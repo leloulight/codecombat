@@ -20,18 +20,14 @@ module.exports = class CocoRouter extends Backbone.Router
     'account': go('account/MainAccountView')
     'account/settings': go('account/AccountSettingsRootView')
     'account/unsubscribe': go('account/UnsubscribeView')
-    #'account/profile': go('user/JobProfileView')  # legacy URL, sent in emails
-    'account/profile': go('EmployersView')  # Show the not-recruiting-now screen
     'account/payments': go('account/PaymentsView')
     'account/subscription': go('account/SubscriptionView')
-    'account/subscription/sale': go('account/SubscriptionSaleView')
     'account/invoices': go('account/InvoicesView')
     'account/prepaid': go('account/PrepaidView')
 
     'admin': go('admin/MainAdminView')
-    'admin/candidates': go('admin/CandidatesView')
     'admin/clas': go('admin/CLAsView')
-    'admin/employers': go('admin/EmployersListView')
+    'admin/design-elements': go('admin/DesignElementsView')
     'admin/files': go('admin/FilesView')
     'admin/analytics': go('admin/AnalyticsView')
     'admin/analytics/subscriptions': go('admin/AnalyticsSubscriptionsView')
@@ -62,15 +58,14 @@ module.exports = class CocoRouter extends Backbone.Router
     'contribute/diplomat': go('contribute/DiplomatView')
     'contribute/scribe': go('contribute/ScribeView')
 
-    'courses/mock1': go('courses/mock1/CoursesView')
-    'courses/mock1/enroll/:courseID': go('courses/mock1/CourseEnrollView')
-    'courses/mock1/:courseID': go('courses/mock1/CourseDetailsView')
     'courses': go('courses/CoursesView')
+    'Courses': go('courses/CoursesView')
     'courses/students': go('courses/StudentCoursesView')
     'courses/teachers': go('courses/TeacherCoursesView')
     'courses/purchase': go('courses/PurchaseCoursesView')
     'courses/enroll(/:courseID)': go('courses/CourseEnrollView')
-    'courses/:courseID(/:courseInstanceID)': go('courses/CourseDetailsView')
+    'courses/:classroomID': go('courses/ClassroomView')
+    'courses/:courseID/:courseInstanceID': go('courses/CourseDetailsView')
 
     'db/*path': 'routeToServer'
     'demo(/*subpath)': go('DemoView')
@@ -91,8 +86,7 @@ module.exports = class CocoRouter extends Backbone.Router
     'editor/campaign/:campaignID': go('editor/campaign/CampaignEditorView')
     'editor/poll': go('editor/poll/PollSearchView')
     'editor/poll/:articleID': go('editor/poll/PollEditView')
-
-    'employers': go('EmployersView')
+    'editor/thang-tasks': go('editor/ThangTasksView')
 
     'file/*path': 'routeToServer'
 
@@ -124,14 +118,14 @@ module.exports = class CocoRouter extends Backbone.Router
 
     'preview': go('HomeView')
 
+    'schools': go('SalesView')
+
     'teachers': go('TeachersView')
     'teachers/freetrial': go('TeachersFreeTrialView')
 
     'test(/*subpath)': go('TestView')
 
     'user/:slugOrID': go('user/MainUserView')
-    #'user/:slugOrID/profile': go('user/JobProfileView')
-    'user/:slugOrID/profile': go('EmployersView')  # Show the not-recruiting-now screen
 
     '*name/': 'removeTrailingSlash'
     '*name': go('NotFoundView')

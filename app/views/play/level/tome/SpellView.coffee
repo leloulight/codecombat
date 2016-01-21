@@ -218,7 +218,7 @@ module.exports = class SpellView extends CocoView
         disableSpaces = @options.level.get('disableSpaces') or false
         aceConfig = me.get('aceConfig') ? {}
         disableSpaces = false if aceConfig.keyBindings and aceConfig.keyBindings isnt 'default'  # Not in vim/emacs mode
-        disableSpaces = false if @spell.language in ['clojure', 'lua', 'coffeescript', 'io']  # Don't disable for more advanced/experimental languages
+        disableSpaces = false if @spell.language in ['clojure', 'lua', 'java', 'coffeescript', 'io']  # Don't disable for more advanced/experimental languages
         if not disableSpaces or (_.isNumber(disableSpaces) and disableSpaces < me.level())
           return @ace.execCommand 'insertstring', ' '
         line = @aceDoc.getLine @ace.getCursorPosition().row
@@ -263,6 +263,14 @@ module.exports = class SpellView extends CocoView
           return true
 
     if me.level() < 20 or aceConfig.indentGuides
+      # Add visual ident guides
+      language = @spell.language
+      ensureLineStartsBlock = (line) ->
+        return false unless language is "python"
+        match = /^\s*([^#]+)/.exec(line)
+        return false if not match?
+        return /:\s*$/.test(match[1])
+
       @aceSession.addDynamicMarker
         update: (html, markerLayer, session, config) =>
           Range = ace.require('ace/range').Range
@@ -276,31 +284,48 @@ module.exports = class SpellView extends CocoView
             ar = str.match(/^\s*/)
             ar.pop().length
 
-          colors = ['50,150,200', '200,150,50', '255,0,0', '0,255,0']
+          colors = [{border: '74,144,226', fill: '108,162,226'}, {border: '132,180,235', fill: '230,237,245'}]
 
           for row in [0..@aceSession.getLength()]
             foldWidgets[row] = @aceSession.getFoldWidget(row) unless foldWidgets[row]?
+            continue unless foldWidgets? and foldWidgets[row] is "start"
+            docRange = @aceSession.getFoldWidgetRange(row)
+            if not docRange?
+              guess = startOfRow(row)
+              docRange = new Range(row,guess,row,guess+4)
 
-            continue if foldWidgets[row] isnt "start"
-            range = @aceSession.getFoldWidgetRange(row)
+            continue unless ensureLineStartsBlock(lines[row])
 
-            xstart = startOfRow(range.start.row)
+            if /^\s+$/.test lines[docRange.end.row+1]
+              docRange.end.row += 1
+
+            rstart = @aceSession.documentToScreenPosition docRange.start.row, docRange.start.column
+            rend = @aceSession.documentToScreenPosition docRange.end.row, docRange.end.column
+            range = new Range rstart.row, rstart.column, rend.row, rend.column
+
+            xstart = startOfRow(row)
             level = Math.floor(xstart / 4)
-            indent = startOfRow(range.start.row + 1)
+            indent = startOfRow(row + 1)
             color = colors[level % colors.length]
+            bw = 3
+            to = markerLayer.$getTop(range.start.row, config)
             t = markerLayer.$getTop(range.start.row + 1, config)
             h = config.lineHeight * (range.end.row - range.start.row)
             l = markerLayer.$padding + xstart * config.characterWidth
             # w = (data.i - data.b) * config.characterWidth
             w = 4 * config.characterWidth
+            fw = config.characterWidth * ( @aceSession.getScreenLastRowColumn(range.start.row) - xstart )
 
-            html.push [
-              '<div style="',
-              "position: absolute; top: #{t}px; left: #{l}px; width: #{w}px; height: #{h}px; background-color: rgba(#{color},0.2);"
-              "border-right: 3px solid rgba(#{color},0.4);",
-              '"></div>' ].join ''
-
-            markerLayer.drawTextMarker html, new Range(range.start.row,xstart, range.start.row, 1000), 'rob', config, "border: 3px solid rgba(#{color}, 0.4); position: absolute"
+            html.push """
+              <div style=
+                "position: absolute; top: #{to}px; left: #{l}px; width: #{fw+bw}px; height: #{config.lineHeight}px;
+                 border: #{bw}px solid rgba(#{color.border},1); border-left: none;"
+              ></div>
+              <div style=
+                "position: absolute; top: #{t}px; left: #{l}px; width: #{w}px; height: #{h}px; background-color: rgba(#{color.fill},0.5);
+                 border-right: #{bw}px solid rgba(#{color.border},1); border-bottom: #{bw}px solid rgba(#{color.border},1);"
+              ></div>
+            """
 
   fillACE: ->
     @ace.setValue @spell.source
@@ -621,18 +646,20 @@ module.exports = class SpellView extends CocoView
     Backbone.Mediator.publish 'tome:cast-spell', spell: @spell, thang: @thang, preload: preload, realTime: realTime
 
   notifySpellChanged: =>
+    return if @destroyed
     Backbone.Mediator.publish 'tome:spell-changed', spell: @spell
 
   notifyEditingEnded: =>
-    return if @aceDoc.undergoingFirepadOperation  # from my Firepad ACE adapter
+    return if @destroyed or @aceDoc.undergoingFirepadOperation  # from my Firepad ACE adapter
     Backbone.Mediator.publish 'tome:editing-ended', {}
 
   notifyEditingBegan: =>
-    return if @aceDoc.undergoingFirepadOperation  # from my Firepad ACE adapter
+    return if @destroyed or @aceDoc.undergoingFirepadOperation  # from my Firepad ACE adapter
     Backbone.Mediator.publish 'tome:editing-began', {}
 
   updateLines: =>
     # Make sure there are always blank lines for the player to type on, and that the editor resizes to the height of the lines.
+    return if @destroyed
     lineCount = @aceDoc.getLength()
     lastLine = @aceDoc.$lines[lineCount - 1]
     if lastLine isnt ''
@@ -664,6 +691,7 @@ module.exports = class SpellView extends CocoView
       spellPaletteView.css('height', newHeight) if @spellPaletteHeight isnt newHeight
 
   hideProblemAlert: ->
+    return if @destroyed
     Backbone.Mediator.publish 'tome:hide-problem-alert', {}
 
   onManualCast: (e) ->
@@ -832,6 +860,7 @@ module.exports = class SpellView extends CocoView
     hashValue = aether.raw + aetherProblem.message
     return if hashValue of @savedProblems
     @savedProblems[hashValue] = true
+    return unless Math.random() < 0.01  # Let's only save a tiny fraction of these during HoC to reduce writes.
 
     # Save new problem
     @userCodeProblem = new UserCodeProblem()
@@ -924,6 +953,7 @@ module.exports = class SpellView extends CocoView
     @spellHasChanged = false
 
   onUserCodeProblem: (e) ->
+    return unless e.god is @options.god
     return @onInfiniteLoop e if e.problem.id is 'runtime_InfiniteLoop'
     return unless e.problem.userInfo.methodName is @spell.name
     return unless spellThang = _.find @spell.thangs, (spellThang, thangID) -> thangID is e.problem.userInfo.thangID
@@ -934,6 +964,7 @@ module.exports = class SpellView extends CocoView
       @updateAether false, false
 
   onNonUserCodeProblem: (e) ->
+    return unless e.god is @options.god
     return unless @spellThang
     problem = @spellThang.aether.createUserCodeProblem type: 'runtime', kind: 'Unhandled', message: "Unhandled error: #{e.problem.message}"
     @spellThang.aether.addProblem problem
