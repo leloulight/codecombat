@@ -1,6 +1,3 @@
-gplusClientID = '800329290710-j9sivplv2gpcdgkrsis9rff3o417mlfa.apps.googleusercontent.com'
-# TODO: Move to GPlusHandler
-
 go = (path) -> -> @routeDirectly path, arguments
 
 module.exports = class CocoRouter extends Backbone.Router
@@ -16,9 +13,9 @@ module.exports = class CocoRouter extends Backbone.Router
     '': ->
       # Testing new home page
       group = me.getHomepageGroup()
-      return @routeDirectly('HomeView', [], { withTeacherNote: true }) if group is 'home-with-note'
-      return @routeDirectly('NewHomeView', [], { jumbotron: 'student' }) if group is 'new-home-student'
-      return @routeDirectly('NewHomeView', [], { jumbotron: 'characters' }) if group is 'new-home-characters'
+#      return @routeDirectly('HomeView', [], { withTeacherNote: true }) if group is 'home-with-note'
+#      return @routeDirectly('NewHomeView', [], { jumbotron: 'student' }) if group is 'new-home-student'
+#      return @routeDirectly('NewHomeView', [], { jumbotron: 'characters' }) if group is 'new-home-characters'
       return @routeDirectly('HomeView', [])
 
     'about': go('AboutView')
@@ -183,12 +180,13 @@ module.exports = class CocoRouter extends Backbone.Router
     $('.popover').popover 'hide'
 
   onGPlusAPILoaded: =>
+    console.log 'loaded'
     @renderLoginButtons()
 
   initializeSocialMediaServices: ->
     return if application.testing or application.demoing
     require('core/services/facebook')()
-    require('core/services/google')()
+    application.gplusHandler.loadAPI()
     require('core/services/twitter')()
 
   renderLoginButtons: =>
@@ -196,22 +194,8 @@ module.exports = class CocoRouter extends Backbone.Router
     $('.share-buttons, .partner-badges').addClass('fade-in').delay(10000).removeClass('fade-in', 5000)
     setTimeout(FB.XFBML.parse, 10) if FB?.XFBML?.parse  # Handles FB login and Like
     twttr?.widgets?.load?()
-
-    return unless gapi?.plusone?
-    gapi.plusone.go?()  # Handles +1 button
-    for gplusButton in $('.gplus-login-button')
-      params = {
-        callback: 'signinCallback',
-        clientid: gplusClientID,
-        cookiepolicy: 'single_host_origin',
-        scope: 'https://www.googleapis.com/auth/plus.login email',
-        height: 'short',
-      }
-      if gapi.signin?.render
-        gapi.signin.render(gplusButton, params)
-      else
-        console.warn 'Didn\'t have gapi.signin to render G+ login button. (DoNotTrackMe extension?)'
-
+    application.gplusHandler.renderLoginButtons()
+    
   activateTab: ->
     base = _.string.words(document.location.pathname[1..], '/')[0]
     $("ul.nav li.#{base}").addClass('active')

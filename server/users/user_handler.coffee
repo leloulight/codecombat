@@ -967,4 +967,20 @@ UserHandler = class UserHandler extends Handler
     @recalculateStats statName
     @sendAccepted res, {}
 
+  get: (req, res) ->
+    if req.query.gplusID and req.query.gplusAccessToken
+      gpID = req.query.gplusID
+      gpAT = req.query.gplusAccessToken
+      url = "https://www.googleapis.com/oauth2/v2/userinfo?access_token=#{gpAT}"
+      request url, (err, response, body) =>
+        body = JSON.parse(body)
+        idsMatch = gpID is body.id
+        return @sendBadInputError(res, 'Invalid G+ Access Token.') unless idsMatch
+        User.findOne({gplusID: gpID}).exec (err, user) =>
+          return @sendDatabaseError(res, err) if err
+          return @sendNotFoundError(res) unless user
+          return @sendSuccess(res, @formatEntity(req, user))
+    else
+      super(req, res)
+
 module.exports = new UserHandler()

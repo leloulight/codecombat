@@ -28,17 +28,18 @@ module.exports = FacebookHandler = class FacebookHandler extends CocoClass
         @loggedIn = true
         break
 
-    if @waitingForLogin and @loggedIn
-      @fetchMeForLogin()
+    trigger 'logged-into-facebook'
+#    if @waitingForLogin and @loggedIn
+#      @fetchMeForLogin()
 
   loginThroughFacebook: ->
     if @loggedIn
-      @fetchMeForLogin()
+      return true
     else
       FB.login ((response) ->
         console.log 'Received FB login response:', response
       ), scope: 'email'
-      @waitingForLogin = true
+#      @waitingForLogin = true
 
   fetchMeForLogin: ->
     FB.api('/me', {fields: 'email,last_name,first_name,gender'}, @onReceiveMeInfo)
