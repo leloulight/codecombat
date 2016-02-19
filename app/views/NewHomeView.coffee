@@ -2,6 +2,7 @@ RootView = require 'views/core/RootView'
 template = require 'templates/new-home-view'
 CocoCollection = require 'collections/CocoCollection'
 Course = require 'models/Course'
+utils = require 'core/utils'
 
 #  TODO: auto margin feature paragraphs
 
@@ -17,7 +18,7 @@ module.exports = class NewHomeView extends RootView
     'click #learn-more-link': 'onClickLearnMoreLink'
 
   initialize: (options) ->
-    @jumbotron = options.jumbotron or 'student' # or 'characters'
+    @jumbotron = options.jumbotron or utils.getQueryVariable('jumbotron') or 'student' # or 'characters'
     @courses = new CocoCollection [], {url: "/db/course", model: Course}
     @supermodel.loadCollection(@courses, 'courses')
 
@@ -72,4 +73,16 @@ module.exports = class NewHomeView extends RootView
     @scrollToLink('#classroom-in-box-container')
 
   onClickTeacherButton: ->
-    @scrollToLink('#request-demo-row', 600)
+    @scrollToLink('.request-demo-row', 600)
+
+  isOldBrowser: ->
+    if $.browser
+      majorVersion = $.browser.versionNumber
+      return true if $.browser.mozilla && majorVersion < 25
+      return true if $.browser.chrome && majorVersion < 31  # Noticed Gems in the Deep not loading with 30
+      return true if $.browser.safari && majorVersion < 6  # 6 might have problems with Aether, or maybe just old minors of 6: https://errorception.com/projects/51a79585ee207206390002a2/errors/547a202e1ead63ba4e4ac9fd
+    else
+      console.warn 'no more jquery browser version...'
+    return false
+
+  
