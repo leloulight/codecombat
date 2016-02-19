@@ -50,7 +50,7 @@
                 | :
               .input-border
                 if me.get('name')
-                  input#name.input-large.form-control(name="name", type="text", value="#{me.get('name')}")
+                  input#name.input-large.form-control(name="name", type="text", value=me.get('name'))
                 else
                   input#name.input-large.form-control(name="name", type="text", value="", placeholder="e.g. Alex W the Skater")
           .col-md-6
@@ -62,7 +62,7 @@
                   span(data-i18n="signup.optional") optional
                   | ):
               .input-border
-                input#school-input.input-large.form-control(name="schoolName", data-i18n="[placeholder]signup.school_name_placeholder")
+                input#school-input.input-large.form-control(name="schoolName", data-i18n="[placeholder]signup.school_name_placeholder", value=formValues.schoolName || '')
         .form-group.checkbox
           label.control-label(for="subscribe")
             .input-border
@@ -83,7 +83,7 @@
         h3(data-i18n="signup.creating") Creating Account...
 
   .auth-network-logins
-    // GitHub login too buggy to survive
+    // GitHub login complete, but the button does not fit in with the design yet. Hidden for now
     //div.network-login
     //  btn.btn.btn-sm.github-login-button#github-login-button
     //    img(src="/images/pages/modal/auth/github_icon.png")

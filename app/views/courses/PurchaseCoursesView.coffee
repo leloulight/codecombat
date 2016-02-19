@@ -37,9 +37,10 @@ module.exports = class PurchaseCoursesView extends RootView
   events:
     'input #students-input': 'onInputStudentsInput'
     'click #purchase-btn': 'onClickPurchaseButton'
-    
+
   onLoaded: ->
     @pricePerStudent = @products.findWhere({name: 'course'}).get('amount')
+    me.setRole 'teacher'
     super()
 
   getPriceString: -> '$' + (@getPrice()/100).toFixed(2)
@@ -73,9 +74,11 @@ module.exports = class PurchaseCoursesView extends RootView
   updatePrice: ->
     @renderSelectors '#price-form-group'
 
+  numberOfStudentsIsValid: -> @numberOfStudents > 0 and @numberOfStudents < 100000
+
   onClickPurchaseButton: ->
     return @openModalView new AuthModal() if me.isAnonymous()
-    if @numberOfStudents < 1 or not _.isFinite(@numberOfStudents)
+    unless @numberOfStudentsIsValid()
       alert("Please enter the maximum number of students needed for your class.")
       return
 

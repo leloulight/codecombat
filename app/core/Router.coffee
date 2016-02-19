@@ -13,7 +13,15 @@ module.exports = class CocoRouter extends Backbone.Router
     @initializeSocialMediaServices = _.once @initializeSocialMediaServices
 
   routes:
-    '': go('HomeView')
+    '': ->
+      if window.serverConfig.picoCTF
+        return @routeDirectly 'play/CampaignView', ['picoctf'], {}
+      # Testing new home page
+      group = me.getHomepageGroup()
+      return @routeDirectly('HomeView', [], { withTeacherNote: true }) if group is 'home-with-note'
+      return @routeDirectly('NewHomeView', [], { jumbotron: 'student' }) if group is 'new-home-student'
+      return @routeDirectly('NewHomeView', [], { jumbotron: 'characters' }) if group is 'new-home-characters'
+      return @routeDirectly('HomeView', [])
 
     'about': go('AboutView')
 
@@ -27,6 +35,7 @@ module.exports = class CocoRouter extends Backbone.Router
 
     'admin': go('admin/MainAdminView')
     'admin/clas': go('admin/CLAsView')
+    'admin/design-elements': go('admin/DesignElementsView')
     'admin/files': go('admin/FilesView')
     'admin/analytics': go('admin/AnalyticsView')
     'admin/analytics/subscriptions': go('admin/AnalyticsSubscriptionsView')
@@ -92,6 +101,7 @@ module.exports = class CocoRouter extends Backbone.Router
     'github/*path': 'routeToServer'
 
     'hoc': go('courses/HourOfCodeView')
+    'home': go('NewHomeView')
 
     'i18n': go('i18n/I18NHomeView')
     'i18n/thang/:handle': go('i18n/I18NEditThangTypeView')
@@ -117,10 +127,13 @@ module.exports = class CocoRouter extends Backbone.Router
 
     'preview': go('HomeView')
 
-    'schools': go('SalesView')
+    'privacy': go('PrivacyView')
 
-    'teachers': go('TeachersView')
-    'teachers/freetrial': go('TeachersFreeTrialView')
+    'schools': go('NewHomeView')
+
+    'teachers': go('NewHomeView')
+    'teachers/freetrial': go('RequestQuoteView')
+    'teachers/quote': go('RequestQuoteView')
 
     'test(/*subpath)': go('TestView')
 
@@ -135,15 +148,16 @@ module.exports = class CocoRouter extends Backbone.Router
   removeTrailingSlash: (e) ->
     @navigate e, {trigger: true}
 
-  routeDirectly: (path, args) ->
+  routeDirectly: (path, args, options={}) ->
+    path = 'play/CampaignView' if window.serverConfig.picoCTF and not /^(views)?\/?play/.test(path)
     path = "views/#{path}" if not _.string.startsWith(path, 'views/')
     ViewClass = @tryToLoadModule path
     if not ViewClass and application.moduleLoader.load(path)
       @listenToOnce application.moduleLoader, 'load-complete', ->
-        @routeDirectly(path, args)
+        @routeDirectly(path, args, options)
       return
     return @openView @notFoundView() if not ViewClass
-    view = new ViewClass({}, args...)  # options, then any path fragment args
+    view = new ViewClass(options, args...)  # options, then any path fragment args
     view.render()
     @openView(view)
 
@@ -170,6 +184,11 @@ module.exports = class CocoRouter extends Backbone.Router
     return unless window.currentView?
     window.currentView.destroy()
     $('.popover').popover 'hide'
+    $('#flying-focus').css({top: 0, left: 0}) # otherwise it might make the page unnecessarily tall
+    _.delay (-> 
+      $('html')[0].scrollTop = 0
+      $('body')[0].scrollTop = 0
+    ), 10
 
   onGPlusAPILoaded: =>
     @renderLoginButtons()

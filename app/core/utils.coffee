@@ -30,6 +30,9 @@ module.exports.normalizeFunc = (func_thing, object) ->
     func_thing = func
   return func_thing
 
+module.exports.objectIdToDate = (objectID) ->
+  new Date(parseInt(objectID.toString().slice(0,8), 16)*1000)
+
 module.exports.hexToHSL = (hex) ->
   rgbToHsl(hexToR(hex), hexToG(hex), hexToB(hex))
 
@@ -249,9 +252,9 @@ module.exports.getPrepaidCodeAmount = getPrepaidCodeAmount = (price=0, users=0, 
   total = price * users * months
   total
 
-module.exports.filterMarkdownCodeLanguages = (text) ->
+module.exports.filterMarkdownCodeLanguages = (text, language) ->
   return '' unless text
-  currentLanguage = me.get('aceConfig')?.language or 'python'
+  currentLanguage = language or me.get('aceConfig')?.language or 'python'
   excludedLanguages = _.without ['javascript', 'python', 'coffeescript', 'clojure', 'lua', 'java', 'io'], currentLanguage
   exclusionRegex = new RegExp "```(#{excludedLanguages.join('|')})\n[^`]+```\n?", 'gm'
   text.replace exclusionRegex, ''

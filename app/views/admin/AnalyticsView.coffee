@@ -1,13 +1,20 @@
+CocoCollection = require 'collections/CocoCollection'
+Course = require 'models/Course'
+CourseInstance = require 'models/CourseInstance'
 require 'vendor/d3'
 d3Utils = require 'core/d3_utils'
 RootView = require 'views/core/RootView'
 template = require 'templates/admin/analytics'
 utils = require 'core/utils'
 
+# TODO: switch page to tabs instead of table of contents 
+
 module.exports = class AnalyticsView extends RootView
   id: 'admin-analytics-view'
   template: template
+  furthestCourseDayRange: 30
   lineColors: ['red', 'blue', 'green', 'purple', 'goldenrod', 'brown', 'darkcyan']
+  minSchoolCount: 20
 
   constructor: (options) ->
     super options
@@ -20,6 +27,8 @@ module.exports = class AnalyticsView extends RootView
     context.activeUsers = @activeUsers ? []
     context.revenue = @revenue ? []
     context.revenueGroups = @revenueGroups ? {}
+    context.dayEnrollmentsMap = @dayEnrollmentsMap ? {}
+    context.enrollmentDays = @enrollmentDays ? []
     context
 
   afterRender: ->
@@ -27,7 +36,7 @@ module.exports = class AnalyticsView extends RootView
     @createLineCharts()
 
   loadData: ->
-    @supermodel.addRequestResource('active_classes', {
+    @supermodel.addRequestResource({
       url: '/db/analytics_perday/-/active_classes'
       method: 'POST'
       success: (data) =>
@@ -58,7 +67,7 @@ module.exports = class AnalyticsView extends RootView
         @render?()
     }, 0).load()
 
-    @supermodel.addRequestResource('active_users', {
+    @supermodel.addRequestResource({
       url: '/db/analytics_perday/-/active_users'
       method: 'POST'
       success: (data) =>
@@ -69,10 +78,11 @@ module.exports = class AnalyticsView extends RootView
 
         @updateAllKPIChartData()
         @updateActiveUsersChartData()
+        @updateCampaignVsClassroomActiveUsersChartData()
         @render?()
     }, 0).load()
 
-    @supermodel.addRequestResource('recurring_revenue', {
+    @supermodel.addRequestResource({
       url: '/db/analytics_perday/-/recurring_revenue'
       method: 'POST'
       success: (data) =>
@@ -81,13 +91,13 @@ module.exports = class AnalyticsView extends RootView
         dayGroupCountMap = {}
         for dailyRevenue in data
           dayGroupCountMap[dailyRevenue.day] ?= {}
-          dayGroupCountMap[dailyRevenue.day]['Daily'] = 0
+          dayGroupCountMap[dailyRevenue.day]['Daily Total'] = 0
           for group, val of dailyRevenue.groups
             groupMap[group] = true
             dayGroupCountMap[dailyRevenue.day][group] = val
-            dayGroupCountMap[dailyRevenue.day]['Daily'] += val
+            dayGroupCountMap[dailyRevenue.day]['Daily Total'] += val
         @revenueGroups = Object.keys(groupMap)
-        @revenueGroups.push 'Daily'
+        @revenueGroups.push 'Daily Total'
         # Build list of recurring revenue entries, where each entry is a day of individual group values
         @revenue = []
         for day of dayGroupCountMap
@@ -115,6 +125,126 @@ module.exports = class AnalyticsView extends RootView
         @render?()
     }, 0).load()
 
+    @supermodel.addRequestResource({
+      url: '/db/user/-/school_counts'
+      method: 'POST'
+      data: {minCount: @minSchoolCount}
+      success: (@schoolCounts) =>
+        @schoolCounts?.sort (a, b) ->
+          return -1 if a.count > b.count
+          return 0 if a.count is b.count
+          1
+        @render?()
+    }, 0).load()
+
+    @supermodel.addRequestResource({
+      url: '/db/prepaid/-/courses'
+      method: 'POST'
+      data: {project: {maxRedeemers: 1, properties: 1, redeemers: 1}}
+      success: (prepaids) =>
+        paidDayMaxMap = {}
+        paidDayRedeemedMap = {}
+        trialDayMaxMap = {}
+        trialDayRedeemedMap = {}
+        for prepaid in prepaids
+          day = utils.objectIdToDate(prepaid._id).toISOString().substring(0, 10)
+          if prepaid.properties?.trialRequestID? or prepaid.properties?.endDate?
+            trialDayMaxMap[day] ?= 0
+            if prepaid.properties?.endDate?
+              trialDayMaxMap[day] += prepaid.redeemers?.length ? 0
+            else
+              trialDayMaxMap[day] += prepaid.maxRedeemers
+            for redeemer in (prepaid.redeemers ? [])
+              redeemDay = redeemer.date.substring(0, 10)
+              trialDayRedeemedMap[redeemDay] ?= 0
+              trialDayRedeemedMap[redeemDay]++
+          else
+            paidDayMaxMap[day] ?= 0
+            paidDayMaxMap[day] += prepaid.maxRedeemers
+            for redeemer in prepaid.redeemers
+              redeemDay = redeemer.date.substring(0, 10)
+              paidDayRedeemedMap[redeemDay] ?= 0
+              paidDayRedeemedMap[redeemDay]++
+              
+        @dayEnrollmentsMap = {}
+        @paidCourseTotalEnrollments = []
+        for day, count of paidDayMaxMap
+          @paidCourseTotalEnrollments.push({day: day, count: count})
+          @dayEnrollmentsMap[day] ?= {paidIssued: 0, paidRedeemed: 0, trialIssued: 0, trialRedeemed: 0}
+          @dayEnrollmentsMap[day].paidIssued += count
+        @paidCourseTotalEnrollments.sort (a, b) -> a.day.localeCompare(b.day)
+        @paidCourseRedeemedEnrollments = []
+        for day, count of paidDayRedeemedMap
+          @paidCourseRedeemedEnrollments.push({day: day, count: count}) 
+          @dayEnrollmentsMap[day] ?= {paidIssued: 0, paidRedeemed: 0, trialIssued: 0, trialRedeemed: 0}
+          @dayEnrollmentsMap[day].paidRedeemed += count
+        @paidCourseRedeemedEnrollments.sort (a, b) -> a.day.localeCompare(b.day)
+        @trialCourseTotalEnrollments = []
+        for day, count of trialDayMaxMap
+          @trialCourseTotalEnrollments.push({day: day, count: count})
+          @dayEnrollmentsMap[day] ?= {paidIssued: 0, paidRedeemed: 0, trialIssued: 0, trialRedeemed: 0}
+          @dayEnrollmentsMap[day].trialIssued += count
+        @trialCourseTotalEnrollments.sort (a, b) -> a.day.localeCompare(b.day)
+        @trialCourseRedeemedEnrollments = []
+        for day, count of trialDayRedeemedMap
+          @trialCourseRedeemedEnrollments.push({day: day, count: count})
+          @dayEnrollmentsMap[day] ?= {paidIssued: 0, paidRedeemed: 0, trialIssued: 0, trialRedeemed: 0}
+          @dayEnrollmentsMap[day].trialRedeemed += count
+        @trialCourseRedeemedEnrollments.sort (a, b) -> a.day.localeCompare(b.day)
+        @updateEnrollmentsChartData()
+        @render?()
+    }, 0).load()
+
+    @courses = new CocoCollection([], { url: "/db/course", model: Course})
+    @courses.comparator = "_id" 
+    @listenToOnce @courses, 'sync', @onCoursesSync
+    @supermodel.loadCollection(@courses)
+
+  onCoursesSync: ->
+    # Assumes courses retrieved in order
+    @courseOrderMap = {}
+    @courseOrderMap[@courses.models[i].get('_id')] = i for i in [0...@courses.models.length]
+
+    startDay = new Date()
+    startDay.setUTCDate(startDay.getUTCDate() - @furthestCourseDayRange)
+    startDay = startDay.toISOString().substring(0, 10)
+    options =
+      url: '/db/course_instance/-/recent'
+      method: 'POST'
+      data: {startDay: startDay}
+    options.error = (models, response, options) =>
+      return if @destroyed
+      console.error 'Failed to get recent course instances', response
+    options.success = (models) =>
+      @courseInstances = models ? [] 
+      @onCourseInstancesSync()
+      @render?()
+    @supermodel.addRequestResource(options, 0).load()
+
+  onCourseInstancesSync: ->
+    return unless @courseInstances
+
+    # Find highest course for teachers and students
+    @teacherFurthestCourseMap = {}
+    @studentFurthestCourseMap = {}
+    for courseInstance in @courseInstances
+      courseID = courseInstance.courseID
+      teacherID = courseInstance.ownerID
+      if not @teacherFurthestCourseMap[teacherID] or @teacherFurthestCourseMap[teacherID] < @courseOrderMap[courseID]
+        @teacherFurthestCourseMap[teacherID] = @courseOrderMap[courseID]
+      for studentID in courseInstance.members
+        if not @studentFurthestCourseMap[studentID] or @studentFurthestCourseMap[studentID] < @courseOrderMap[courseID]
+          @studentFurthestCourseMap[studentID] = @courseOrderMap[courseID]
+
+    @teacherCourseDistribution = {}
+    for teacherID, courseIndex of @teacherFurthestCourseMap
+      @teacherCourseDistribution[courseIndex] ?= 0
+      @teacherCourseDistribution[courseIndex]++
+    @studentCourseDistribution = {}
+    for studentID, courseIndex of @studentFurthestCourseMap
+      @studentCourseDistribution[courseIndex] ?= 0
+      @studentCourseDistribution[courseIndex]++
+
   createLineChartPoints: (days, data) ->
     points = []
     for entry, i in data
@@ -123,18 +253,19 @@ module.exports = class AnalyticsView extends RootView
         y: entry.value
 
     # Trim points preceding days
-    for point, i in points
-      if point.day is days[0]
-        points.splice(0, i)
-        break
+    if points.length and days.length and points[0].day.localeCompare(days[0]) < 0
+      for point, i in points
+        if point.day.localeCompare(days[0]) >= 0
+          points.splice(0, i)
+          break
 
     # Ensure points for each day
     for day, i in days
       if points.length <= i or points[i].day isnt day
         prevY = if i > 0 then points[i - 1].y else 0.0
         points.splice i, 0,
-          y: prevY
           day: day
+          y: prevY
       points[i].x = i
 
     points.splice(0, points.length - days.length) if points.length > days.length
@@ -144,18 +275,25 @@ module.exports = class AnalyticsView extends RootView
     d3Utils.createLineChart('.kpi-recent-chart', @kpiRecentChartLines)
     d3Utils.createLineChart('.kpi-chart', @kpiChartLines)
     d3Utils.createLineChart('.active-classes-chart', @activeClassesChartLines)
-    d3Utils.createLineChart('.active-users-chart', @activeUsersChartLines)
+    d3Utils.createLineChart('.classroom-daily-active-users-chart', @classroomDailyActiveUsersChartLines)
+    d3Utils.createLineChart('.classroom-monthly-active-users-chart', @classroomMonthlyActiveUsersChartLines)
+    d3Utils.createLineChart('.campaign-daily-active-users-chart', @campaignDailyActiveUsersChartLines)
+    d3Utils.createLineChart('.campaign-monthly-active-users-chart', @campaignMonthlyActiveUsersChartLines)
+    d3Utils.createLineChart('.campaign-vs-classroom-monthly-active-users-recent-chart.line-chart-container', @campaignVsClassroomMonthlyActiveUsersRecentChartLines)
+    d3Utils.createLineChart('.campaign-vs-classroom-monthly-active-users-chart.line-chart-container', @campaignVsClassroomMonthlyActiveUsersChartLines)
+    d3Utils.createLineChart('.paid-courses-chart', @enrollmentsChartLines)
     d3Utils.createLineChart('.recurring-revenue-chart', @revenueChartLines)
 
   updateAllKPIChartData: ->
     @kpiRecentChartLines = []
     @kpiChartLines = []
     @updateKPIChartData(60, @kpiRecentChartLines)
-    @updateKPIChartData(300, @kpiChartLines)
+    @updateKPIChartData(365, @kpiChartLines)
 
   updateKPIChartData: (timeframeDays, chartLines) ->
     days = d3Utils.createContiguousDays(timeframeDays)
 
+    # Build active classes KPI line
     if @activeClasses?.length > 0
       data = []
       for entry in @activeClasses
@@ -166,13 +304,14 @@ module.exports = class AnalyticsView extends RootView
       points = @createLineChartPoints(days, data)
       chartLines.push
         points: points
-        description: '30-day Active Classes'
+        description: 'Monthly Active Classes'
         lineColor: 'blue'
         strokeWidth: 1
         min: 0
         max: _.max(points, 'y').y
         showYScale: true
 
+    # Build recurring revenue KPI line
     if @revenue?.length > 0
       data = []
       for entry in @revenue
@@ -183,26 +322,55 @@ module.exports = class AnalyticsView extends RootView
       points = @createLineChartPoints(days, data)
       chartLines.push
         points: points
-        description: '30-day Recurring Revenue (in thousands)'
+        description: 'Monthly Recurring Revenue (in thousands)'
         lineColor: 'green'
         strokeWidth: 1
         min: 0
         max: _.max(points, 'y').y
         showYScale: true
 
+    # Build campaign and classroom MAU KPI lines
     if @activeUsers?.length > 0
-      data = []
+      eventDayDataMap = {}
       for entry in @activeUsers
-        break unless entry.monthlyCount
-        data.push
-          day: entry.day
-          value: entry.monthlyCount / 1000
-      data.reverse()
-      points = @createLineChartPoints(days, data)
+        day = entry.day
+        for event, count of entry.events
+          if event.indexOf('MAU campaign') >= 0
+            eventDayDataMap['MAU campaign'] ?= {}
+            eventDayDataMap['MAU campaign'][day] ?= 0
+            eventDayDataMap['MAU campaign'][day] += count
+          else if event.indexOf('MAU classroom') >= 0
+            eventDayDataMap['MAU classroom'] ?= {}
+            eventDayDataMap['MAU classroom'][day] ?= 0
+            eventDayDataMap['MAU classroom'][day] += count
+
+      campaignData = []
+      classroomData = []
+      for event, entry of eventDayDataMap
+        if event is 'MAU campaign'
+          for day, count of entry
+            campaignData.push day: day, value: count / 1000
+        else
+          for day, count of entry
+            classroomData.push day: day, value: count / 1000
+      campaignData.reverse()
+      classroomData.reverse()
+
+      points = @createLineChartPoints(days, classroomData)
       chartLines.push
         points: points
-        description: '30-day Active Users (in thousands)'
+        description: 'Classroom Monthly Active Users (in thousands)'
         lineColor: 'red'
+        strokeWidth: 1
+        min: 0
+        max: _.max(points, 'y').y
+        showYScale: true
+
+      points = @createLineChartPoints(days, campaignData)
+      chartLines.push
+        points: points
+        description: 'Campaign Monthly Active Users (in thousands)'
+        lineColor: 'purple'
         strokeWidth: 1
         min: 0
         max: _.max(points, 'y').y
@@ -242,55 +410,238 @@ module.exports = class AnalyticsView extends RootView
     line.max = totalMax for line in @activeClassesChartLines
 
   updateActiveUsersChartData: ->
-    @activeUsersChartLines = []
+    # Create chart lines for the active user events returned by active_users in analytics_perday_handler
+    @campaignDailyActiveUsersChartLines = []
+    @campaignMonthlyActiveUsersChartLines = []
+    @classroomDailyActiveUsersChartLines = []
+    @classroomMonthlyActiveUsersChartLines = []
     return unless @activeUsers?.length
     days = d3Utils.createContiguousDays(90)
 
-    dailyData = []
-    monthlyData = []
-    dausmausData = []
-    colorIndex = 0
+    # Separate day/value arrays by event
+    eventDataMap = {}
     for entry in @activeUsers
-      dailyData.push
+      day = entry.day
+      for event, count of entry.events
+        eventDataMap[event] ?= []
+        eventDataMap[event].push 
+          day: entry.day
+          value: count
+
+    # Build chart lines for each event
+    eventLineMap = 
+      'DAU campaign': {max: 0, colorIndex: 0}
+      'MAU campaign': {max: 0, colorIndex: 0}
+      'DAU classroom': {max: 0, colorIndex: 0}
+      'MAU classroom': {max: 0, colorIndex: 0}
+    for event, data of eventDataMap
+      data.reverse()
+      points = @createLineChartPoints(days, data)
+      max = _.max(points, 'y').y
+      if event.indexOf('DAU campaign') >= 0
+        chartLines = @campaignDailyActiveUsersChartLines
+        eventLineMap['DAU campaign'].max = Math.max(eventLineMap['DAU campaign'].max, max)
+        lineColor = @lineColors[eventLineMap['DAU campaign'].colorIndex++ % @lineColors.length]
+      else if event.indexOf('MAU campaign') >= 0
+        chartLines = @campaignMonthlyActiveUsersChartLines
+        eventLineMap['MAU campaign'].max = Math.max(eventLineMap['MAU campaign'].max, max) 
+        lineColor = @lineColors[eventLineMap['MAU campaign'].colorIndex++ % @lineColors.length]
+      else if event.indexOf('DAU classroom') >= 0
+        chartLines = @classroomDailyActiveUsersChartLines
+        eventLineMap['DAU classroom'].max = Math.max(eventLineMap['DAU classroom'].max, max) 
+        lineColor = @lineColors[eventLineMap['DAU classroom'].colorIndex++ % @lineColors.length]
+      else if event.indexOf('MAU classroom') >= 0
+        chartLines = @classroomMonthlyActiveUsersChartLines 
+        eventLineMap['MAU classroom'].max = Math.max(eventLineMap['MAU classroom'].max, max) 
+        lineColor = @lineColors[eventLineMap['MAU classroom'].colorIndex++ % @lineColors.length]
+      chartLines.push
+        points: points
+        description: event
+        lineColor: lineColor 
+        strokeWidth: 1
+        min: 0
+        showYScale: false
+
+    # Update line Y scales and maxes
+    showYScaleSet = false
+    for line in @campaignDailyActiveUsersChartLines
+      line.max = eventLineMap['DAU campaign'].max
+      unless showYScaleSet
+        line.showYScale = true
+        showYScaleSet = true 
+    showYScaleSet = false
+    for line in @campaignMonthlyActiveUsersChartLines
+      line.max = eventLineMap['MAU campaign'].max
+      unless showYScaleSet
+        line.showYScale = true
+        showYScaleSet = true
+    showYScaleSet = false
+    for line in @classroomDailyActiveUsersChartLines
+      line.max = eventLineMap['DAU classroom'].max
+      unless showYScaleSet
+        line.showYScale = true
+        showYScaleSet = true 
+    showYScaleSet = false
+    for line in @classroomMonthlyActiveUsersChartLines
+      line.max = eventLineMap['MAU classroom'].max
+      unless showYScaleSet
+        line.showYScale = true
+        showYScaleSet = true 
+
+  updateCampaignVsClassroomActiveUsersChartData: ->
+    @campaignVsClassroomMonthlyActiveUsersRecentChartLines = []
+    @campaignVsClassroomMonthlyActiveUsersChartLines = []
+    return unless @activeUsers?.length
+
+    # Separate day/value arrays by event
+    eventDataMap = {}
+    for entry in @activeUsers
+      day = entry.day
+      for event, count of entry.events
+        eventDataMap[event] ?= []
+        eventDataMap[event].push 
+          day: entry.day
+          value: count
+
+    days = d3Utils.createContiguousDays(90)
+    colorIndex = 0
+    max = 0
+    for event, data of eventDataMap
+      if event is 'MAU campaign paid'
+        points = @createLineChartPoints(days, _.cloneDeep(data).reverse())
+        max = Math.max(max, _.max(points, 'y').y)
+        @campaignVsClassroomMonthlyActiveUsersRecentChartLines.push
+          points: points
+          description: event
+          lineColor: @lineColors[colorIndex++ % @lineColors.length] 
+          strokeWidth: 1
+          min: 0
+          showYScale: true
+      else if event is 'MAU classroom paid'
+        points = @createLineChartPoints(days, _.cloneDeep(data).reverse())
+        max = Math.max(max, _.max(points, 'y').y)
+        @campaignVsClassroomMonthlyActiveUsersRecentChartLines.push
+          points: points
+          description: event
+          lineColor: @lineColors[colorIndex++ % @lineColors.length] 
+          strokeWidth: 1
+          min: 0
+          showYScale: false
+
+    for line in @campaignVsClassroomMonthlyActiveUsersRecentChartLines
+      line.max = max
+
+    days = d3Utils.createContiguousDays(365)
+    colorIndex = 0
+    max = 0
+    for event, data of eventDataMap
+      if event is 'MAU campaign paid'
+        points = @createLineChartPoints(days, _.cloneDeep(data).reverse())
+        max = Math.max(max, _.max(points, 'y').y)
+        @campaignVsClassroomMonthlyActiveUsersChartLines.push
+          points: points
+          description: event
+          lineColor: @lineColors[colorIndex++ % @lineColors.length] 
+          strokeWidth: 1
+          min: 0
+          showYScale: true
+      else if event is 'MAU classroom paid'
+        points = @createLineChartPoints(days, _.cloneDeep(data).reverse())
+        max = Math.max(max, _.max(points, 'y').y)
+        @campaignVsClassroomMonthlyActiveUsersChartLines.push
+          points: points
+          description: event
+          lineColor: @lineColors[colorIndex++ % @lineColors.length] 
+          strokeWidth: 1
+          min: 0
+          showYScale: false
+
+    for line in @campaignVsClassroomMonthlyActiveUsersChartLines
+      line.max = max
+
+  updateEnrollmentsChartData: ->
+    @enrollmentsChartLines = []
+    return unless @paidCourseTotalEnrollments?.length and @trialCourseTotalEnrollments?.length
+    days = d3Utils.createContiguousDays(90, false)
+    @enrollmentDays = _.cloneDeep(days)
+    @enrollmentDays.reverse()
+
+    colorIndex = 0
+    dailyMax = 0
+
+    data = []
+    total = 0
+    for entry in @paidCourseTotalEnrollments
+      total += entry.count
+      data.push
         day: entry.day
-        value: entry.dailyCount / 1000
-      if entry.monthlyCount
-        monthlyData.push
-          day: entry.day
-          value: entry.monthlyCount / 1000
-        dausmausData.push
-          day: entry.day
-          value: Math.round(entry.dailyCount / entry.monthlyCount * 100)
-    dailyData.reverse()
-    monthlyData.reverse()
-    dausmausData.reverse()
-    dailyPoints = @createLineChartPoints(days, dailyData)
-    monthlyPoints = @createLineChartPoints(days, monthlyData)
-    dausmausPoints = @createLineChartPoints(days, dausmausData)
-    @activeUsersChartLines.push
-      points: dailyPoints
-      description: 'Daily active users (in thousands)'
+        value: total
+    points = @createLineChartPoints(days, data)
+    @enrollmentsChartLines.push
+      points: points
+      description: 'Total paid enrollments issued'
       lineColor: @lineColors[colorIndex++ % @lineColors.length]
       strokeWidth: 1
       min: 0
-      max: _.max(dailyPoints, 'y').y
+      max: _.max(points, 'y').y
       showYScale: true
-    @activeUsersChartLines.push
-      points: monthlyPoints
-      description: 'Monthly active users (in thousands)'
+    dailyMax = _.max([dailyMax, _.max(points, 'y').y])
+
+    data = []
+    total = 0
+    for entry in @paidCourseRedeemedEnrollments
+      total += entry.count
+      data.push
+        day: entry.day
+        value: total
+    points = @createLineChartPoints(days, data)
+    @enrollmentsChartLines.push
+      points: points
+      description: 'Total paid enrollments redeemed'
       lineColor: @lineColors[colorIndex++ % @lineColors.length]
       strokeWidth: 1
       min: 0
-      max: _.max(monthlyPoints, 'y').y
-      showYScale: true
-    @activeUsersChartLines.push
-      points: dausmausPoints
-      description: 'DAUs/MAUs %'
+      max: _.max(points, 'y').y
+      showYScale: false
+    dailyMax = _.max([dailyMax, _.max(points, 'y').y])
+
+    data = []
+    total = 0
+    for entry in @trialCourseTotalEnrollments
+      total += entry.count
+      data.push
+        day: entry.day
+        value: total
+    points = @createLineChartPoints(days, data)
+    @enrollmentsChartLines.push
+      points: points
+      description: 'Total trial enrollments issued'
       lineColor: @lineColors[colorIndex++ % @lineColors.length]
       strokeWidth: 1
       min: 0
-      max: _.max(dausmausPoints, 'y').y
-      showYScale: true
+      max: _.max(points, 'y').y
+      showYScale: false
+    dailyMax = _.max([dailyMax, _.max(points, 'y').y])
+
+    data = []
+    total = 0
+    for entry in @trialCourseRedeemedEnrollments
+      total += entry.count
+      data.push
+        day: entry.day
+        value: total
+    points = @createLineChartPoints(days, data)
+    @enrollmentsChartLines.push
+      points: points
+      description: 'Total trial enrollments redeemed'
+      lineColor: @lineColors[colorIndex++ % @lineColors.length]
+      strokeWidth: 1
+      min: 0
+      max: _.max(points, 'y').y
+      showYScale: false
+    dailyMax = _.max([dailyMax, _.max(points, 'y').y])
+
+    line.max = dailyMax for line in @enrollmentsChartLines
 
   updateRevenueChartData: ->
     @revenueChartLines = []
@@ -304,7 +655,6 @@ module.exports = class AnalyticsView extends RootView
         groupDayMap[@revenueGroups[i]][entry.day] ?= 0
         groupDayMap[@revenueGroups[i]][entry.day] += count
 
-    lines = []
     colorIndex = 0
     dailyMax = 0
     for group, entries of groupDayMap
@@ -317,12 +667,12 @@ module.exports = class AnalyticsView extends RootView
       points = @createLineChartPoints(days, data)
       @revenueChartLines.push
         points: points
-        description: group.replace('DRR ', '')
+        description: group.replace('DRR ', 'Daily ')
         lineColor: @lineColors[colorIndex++ % @lineColors.length]
         strokeWidth: 1
         min: 0
         max: _.max(points, 'y').y
-        showYScale: group in ['Daily', 'Monthly']
-      dailyMax = _.max(points, 'y').y if group is 'Daily'
+        showYScale: group in ['Daily Total', 'Monthly']
+      dailyMax = _.max(points, 'y').y if group is 'Daily Total'
       for line in @revenueChartLines when line.description isnt 'Monthly'
         line.max = dailyMax

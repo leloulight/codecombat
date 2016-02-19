@@ -19,11 +19,11 @@ module.exports = class User extends CocoModel
   broadName: ->
     name = @get('name')
     return name if name
-    name = _.filter([@get('firstName'), @get('lastName')]).join('')
+    name = _.filter([@get('firstName'), @get('lastName')]).join(' ')
     return name if name
     email = @get('email')
     return email if email
-    return ''
+    return 'Anoner'
 
   getPhotoURL: (size=80, useJobProfilePhoto=false, useEmployerPageAvatar=false) ->
     photoURL = if useJobProfilePhoto then @get('jobProfile')?.photoURL else null
@@ -58,6 +58,15 @@ module.exports = class User extends CocoModel
     @set 'emails', newSubs
 
   isEmailSubscriptionEnabled: (name) -> (@get('emails') or {})[name]?.enabled
+
+  setRole: (role, force=false) ->
+    return if me.isAdmin()
+    oldRole = @get 'role'
+    return if oldRole is role or (oldRole and not force)
+    @set 'role', role
+    @patch()
+    application.tracker?.updateRole()
+    return @get 'role'
 
   a = 5
   b = 100
@@ -124,6 +133,16 @@ module.exports = class User extends CocoModel
     @announcesActionAudioGroup = 'all-audio' if me.isAdmin()
     application.tracker.identify announcesActionAudioGroup: @announcesActionAudioGroup unless me.isAdmin()
     @announcesActionAudioGroup
+
+  getHomepageGroup: ->
+    return 'home-with-note' unless _.string.startsWith(me.get('preferredLanguage', true) or 'en-US', 'en')
+    return @homepageGroup if @homepageGroup
+    group = me.get('testGroupNumber') % 4
+    @homepageGroup = switch group
+      when 0, 1 then 'home-with-note'
+      when 2, 3 then 'new-home-student'
+    application.tracker.identify newHomepageGroup: @homepageGroup unless me.isAdmin()
+    return @homepageGroup
 
   # Signs and Portents was receiving updates after test started, and also had a big bug on March 4, so just look at test from March 5 on.
   # ... and stopped working well until another update on March 10, so maybe March 11+...
