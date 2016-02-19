@@ -79,6 +79,7 @@ _.extend UserSchema.properties,
     archmageNews: {$ref: '#/definitions/emailSubscription'}
     artisanNews: {$ref: '#/definitions/emailSubscription'}
     diplomatNews: {$ref: '#/definitions/emailSubscription'}
+    teacherNews: {$ref: '#/definitions/emailSubscription'}
     scribeNews: {$ref: '#/definitions/emailSubscription'}
 
     # notifications
@@ -326,6 +327,7 @@ _.extend UserSchema.properties,
     description: 'Prepaid which has paid for this user\'s course access'
   })
   schoolName: {type: 'string'}
+  role: {type: 'string'}  # unset, 'student', 'teacher', 'parent', 'technology coordinator', 'advisor', 'principal', 'superintendent', ...
 
 c.extendBasicProperties UserSchema, 'user'
 

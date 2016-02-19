@@ -17,15 +17,15 @@ module.exports = class SalesView extends RootView
     'CodeCombat'
 
   onClickContactUs: (e) ->
-    app.router.navigate '/teachers/freetrial', trigger: true
+    app.router.navigate '/teachers/quote', trigger: true
 
   onClickLogin: (e) ->
     @openModalView new AuthModal(mode: 'login') if me.get('anonymous')
-    window.tracker?.trackEvent 'Started Login', category: 'Sales', label: 'Sales Login'
+    window.tracker?.trackEvent 'Started Login', category: 'Sales', label: 'Sales Login', ['Mixpanel']
 
   onClickSignup: (e) ->
     @openModalView new AuthModal() if me.get('anonymous')
-    window.tracker?.trackEvent 'Started Signup', category: 'Sales', label: 'Sales Create'
+    window.tracker?.trackEvent 'Started Signup', category: 'Sales', label: 'Sales Create', ['Mixpanel']
 
   logoutRedirectURL: false
 

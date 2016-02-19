@@ -7,9 +7,11 @@ module.exports = class HomeView extends RootView
 
   events:
     'click #play-button': 'onClickPlayButton'
+    'click #close-teacher-note-link': 'onClickCloseTeacherNoteLink'
 
-  constructor: ->
+  constructor: (options={}) ->
     super()
+    @withTeacherNote = options.withTeacherNote
     window.tracker?.trackEvent 'Homepage Loaded', category: 'Homepage'
     if @getQueryVariable 'hour_of_code'
       application.router.navigate "/hoc", trigger: true
@@ -55,3 +57,6 @@ module.exports = class HomeView extends RootView
 
   isNewPlayer: ->
     not me.get('stats')?.gamesCompleted and not me.get('heroConfig')
+
+  onClickCloseTeacherNoteLink: ->
+    @$('.style-flat').addClass('hide')
