@@ -26,11 +26,24 @@ PrepaidHandler = class PrepaidHandler extends Handler
 
   getByRelationship: (req, res, args...) ->
     relationship = args[1]
+    return @getCoursePrepaidsAPI(req, res) if relationship is 'courses'
     return @getPrepaidAPI(req, res, args[2]) if relationship is 'code'
     return @createPrepaidAPI(req, res) if relationship is 'create'
     return @purchasePrepaidAPI(req, res) if relationship is 'purchase'
     return @postRedeemerAPI(req, res, args[0]) if relationship is 'redeemers'
     super arguments...
+
+  getCoursePrepaidsAPI: (req, res, code) ->
+    return @sendSuccess(res, []) unless req.user?.isAdmin()
+    query = {$and: [
+      {type: 'course'}, 
+      {maxRedeemers: {$ne: "9999"}}, 
+      {'properties.courseIDs': {$exists: false}},
+      {_id: {$gt: cutoffID}}
+      ]}
+    Prepaid.find(query, req.body.project).exec (err, documents) =>
+      return @sendDatabaseError(res, err) if err
+      @sendSuccess(res, documents)
 
   getPrepaidAPI: (req, res, code) ->
     return @sendForbiddenError(res) unless req.user?
@@ -189,13 +202,18 @@ PrepaidHandler = class PrepaidHandler extends Handler
             @logError(user, "createCharge error: #{JSON.stringify(err)}")
             return done(err)
 
-          StripeUtils.createPayment user, charge, (err, payment) =>
+          @createPrepaid user, type, maxRedeemers, {}, (err, prepaid) =>
             if err
-              @logError(user, "createPayment error: #{JSON.stringify(err)}")
+              @logError(user, "createPrepaid error: #{JSON.stringify(err)}")
               return done(err)
-            msg = "Prepaid code purchased: #{type} seats=#{maxRedeemers} #{user.get('email')}"
-            hipchat.sendHipChatMessage msg, ['tower']
-            @createPrepaid(user, type, maxRedeemers, {}, done)
+
+            StripeUtils.createPayment user, charge, {prepaidID: prepaid._id}, (err, payment) =>
+              if err
+                @logError(user, "createPayment error: #{JSON.stringify(err)}")
+                return done(err)
+              msg = "Prepaid code purchased: #{type} seats=#{maxRedeemers} #{user.get('email')}"
+              hipchat.sendHipChatMessage msg, ['tower']
+              done(null, prepaid)
 
   purchasePrepaidTerminalSubscription: (user, description, maxRedeemers, months, timestamp, token, product, done) ->
     type = 'terminal_subscription'
@@ -221,27 +239,18 @@ PrepaidHandler = class PrepaidHandler extends Handler
           @logError(user, "createCharge error: #{JSON.stringify(err)}")
           return done(err)
 
-        StripeUtils.createPayment user, charge, (err, payment) =>
+        @createPrepaid user, type, maxRedeemers, {months: months}, (err, prepaid) =>
           if err
-            @logError(user, "createPayment error: #{JSON.stringify(err)}")
+            @logError(user, "createPrepaid error: #{JSON.stringify(err)}")
             return done(err)
 
-          Prepaid.generateNewCode (code) =>
-            return done('Database error.') unless code
-            prepaid = new Prepaid
-              creator: user._id
-              type: type
-              code: code
-              maxRedeemers: parseInt(maxRedeemers)
-              redeemers: []
-              properties:
-                months: months
-            prepaid.save (err) =>
-              return done(err) if err
-              msg = "Prepaid code purchased: #{type} users=#{maxRedeemers} months=#{months} #{user.get('email')}"
-              hipchat.sendHipChatMessage msg, ['tower']
-              return done(null, prepaid)
-
+          StripeUtils.createPayment user, charge, {prepaidID: prepaid._id}, (err, payment) =>
+            if err
+              @logError(user, "createPayment error: #{JSON.stringify(err)}")
+              return done(err)
+            msg = "Prepaid code purchased: #{type} users=#{maxRedeemers} months=#{months} #{user.get('email')}"
+            hipchat.sendHipChatMessage msg, ['tower']
+            done(null, prepaid)
 
   get: (req, res) ->
     if creator = req.query.creator
